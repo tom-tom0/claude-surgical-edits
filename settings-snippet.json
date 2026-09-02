@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/block-full-rewrite.py",
+            "timeout": 15,
+            "statusMessage": "Checking for wasteful full-file rewrite"
+          }
+        ]
+      }
+    ]
+  }
+}
