@@ -194,8 +194,19 @@ def main():
     check("10k lines, 3 changed", payload(f10k, lines(10000).replace("line 5000\n", "X\n")), "deny", max_seconds=5)
     check("10k lines, all different", payload(f10k, lines(10000, prefix="zzz")), "allow", max_seconds=10)
     f60k = fixture("f60k.txt", lines(60000))
-    check("60k lines (over MAX_LINES cap)", payload(f60k, lines(60000).replace("line 5\n", "X\n")), "allow", max_seconds=5)
-    check("40-line file, 60k-line new content", payload(f40, lines(60000)), "allow", max_seconds=5)
+    check("60k lines, 1 changed (no line cap anymore)", payload(f60k, lines(60000).replace("line 5\n", "X\n")), "deny", max_seconds=3)
+    f100k = fixture("f100k.txt", lines(100000))
+    check("100k lines, 1 changed", payload(f100k, lines(100000).replace("line 5\n", "X\n")), "deny", max_seconds=3)
+    check("100k-line file, small new content (early allow)", payload(f100k, lines(100)), "allow", max_seconds=3)
+    # Retyping all 40 old lines then appending 60k more is still a retype +
+    # append — same semantics as the small append case in Group 3: deny.
+    check("40-line file, 60k-line new content (append)", payload(f40, lines(60000)), "deny", max_seconds=3)
+    fhuge = os.path.join(SANDBOX, "huge.txt")
+    with open(fhuge, "w") as f:
+        chunk = "padding line for the byte guard\n" * 100000
+        while f.tell() < 33 * 1024 * 1024:
+            f.write(chunk)
+    check("33MB file (over byte guard) -> fail open", payload(fhuge, lines(40)), "allow", max_seconds=3)
     f49k = fixture("f49k.txt", lines(49000))
     check("49k lines similar (under cap)", payload(f49k, lines(49000).replace("line 7\n", "X\n")), "deny", max_seconds=3)
 

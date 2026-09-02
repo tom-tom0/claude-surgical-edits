@@ -7,6 +7,7 @@ any error so it never blocks legitimate writes.
 """
 import difflib
 import json
+import os
 import sys
 from collections import Counter
 
@@ -14,9 +15,11 @@ from collections import Counter
 # would be retyped, and when most of the file is staying the same.
 MIN_UNCHANGED_LINES = 20
 MIN_UNCHANGED_FRACTION = 0.5
-# Above this size, even reading/counting lines is not worth it; fail open
-# instantly rather than risk burning CPU until the hook timeout.
-MAX_LINES = 50000
+# Read guard only (checked via stat before opening): don't slurp truly huge
+# files into memory. No source file approaches this; a denial needs the new
+# content to contain >=50% of the old lines anyway, and tool output caps
+# keep new content under ~1MB, so nothing this large can ever be denied.
+MAX_BYTES = 32 * 1024 * 1024
 # difflib's worst case (heavily interleaved changes) is quadratic: ~1.6s at
 # 5k lines but ~26s at 20k — past the hook timeout. Up to this size the
 # exact diff runs; above it, an O(n) multiset estimate decides instead.
@@ -33,6 +36,8 @@ def main():
     if not path or new_content is None:
         return
     try:
+        if os.path.getsize(path) > MAX_BYTES:
+            return  # don't slurp truly huge files; nothing this big can be denied
         # newline="" preserves CRLF/LF so line-ending changes are compared
         # faithfully instead of being translated away on read.
         with open(path, "r", encoding="utf-8", newline="") as f:
@@ -45,7 +50,10 @@ def main():
     new_lines = new_content.splitlines(keepends=True)
     if len(old_lines) < MIN_UNCHANGED_LINES:
         return  # short file: rewriting it is cheap
-    if len(old_lines) > MAX_LINES or len(new_lines) > MAX_LINES:
+    # Unchanged lines can never exceed the new content's line count, so if
+    # the new content is under half the old file, the fraction test can
+    # never pass — allow instantly, whatever the file's size.
+    if len(new_lines) < MIN_UNCHANGED_FRACTION * len(old_lines):
         return
     # O(n) prescreen: the multiset intersection is an upper bound on the
     # ordered unchanged-line count. If even the upper bound is under the

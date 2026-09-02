@@ -30,14 +30,19 @@ binary/non-UTF-8 files, line-ending conversions, and genuine rewrites where
 most content changes all pass through. Any internal error fails open — a
 broken hook can never block your work.
 
-**Large files.** The check is engineered to stay instant at any size people
-actually hit: an O(n) prescreen fast-paths genuine rewrites, the exact diff
-runs up to 5,000 lines, and above that a conservative O(n) estimate decides
-(files over 50,000 lines fail open entirely). Measured worst cases — the
-adversarial ones, not the friendly ones: 49,000 lines with every other line
-changed (difflib's quadratic nightmare, which would otherwise take ~2.5
-minutes) answers in ~80 ms; a 10 MB file of long minified lines in ~130 ms.
-The registered hook timeout is 15 s; nothing measured comes within 100x of it.
+**Large files — no line cap.** The check protects files of *any* line count
+and stays instant doing it: writes of new content under half the file's line
+count are allowed without diffing (a denial mathematically requires ≥50%
+retyped lines), the exact diff runs up to 5,000 lines, and above that a
+conservative O(n) estimate decides. The only opt-out is a 32 MB byte guard
+(checked by `stat` before reading) that no real source file approaches — and
+a file that large could never be denied anyway, since tool output limits cap
+new content far below half of it. Measured worst cases — the adversarial
+ones, not the friendly ones: 100,000 lines with 1 changed denies in ~110 ms;
+49,000 lines with every other line changed (difflib's quadratic nightmare,
+which would otherwise take ~2.5 minutes) answers in ~80 ms; a 10 MB file of
+long minified lines in ~115 ms. The registered hook timeout is 15 s; nothing
+measured comes within 100x of it.
 
 ## Install
 
@@ -62,7 +67,7 @@ silently does nothing until the command is fixed.
 ## Verify and benchmark
 
 ```sh
-python3 hooks/test_block_full_rewrite.py    # 53-case test suite
+python3 hooks/test_block_full_rewrite.py    # 56-case test suite
 python3 hooks/benchmark_token_savings.py    # token-savings benchmark
 ```
 
