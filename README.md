@@ -21,9 +21,13 @@ Two layers, both user-level (apply to every project and session):
 2. **Enforcement hook** (`hooks/block-full-rewrite.py`) — a `PreToolUse` hook
    on the `Write` tool. Before any write executes, it diffs the proposed
    content against the existing file. If the write would retype **20+
-   unchanged lines** and **at least 50% of the file stays the same**, it is
-   denied with a message telling the model to use `Edit` instead. The model
-   sees the message and self-corrects in the same turn.
+   unchanged substantive lines** and **at least 50% of the file's substantive
+   lines stay the same**, it is denied with a message telling the model to
+   use `Edit` instead. The model sees the message and self-corrects in the
+   same turn. Trivial lines (blanks, lone braces — ≤3 chars stripped) don't
+   count as retyping: a genuine CSS/JS rewrite keeps every `}` and blank
+   separator, and counting those caused false blocks in a 48-scenario study
+   of real edit patterns (`benchmarks/edit-patterns.md`).
 
 The hook never blocks legitimate writes: new files, short files (< 20 lines),
 binary/non-UTF-8 files, line-ending conversions, and genuine rewrites where
@@ -67,7 +71,7 @@ silently does nothing until the command is fixed.
 ## Verify and benchmark
 
 ```sh
-python3 hooks/test_block_full_rewrite.py    # 56-case test suite
+python3 hooks/test_block_full_rewrite.py    # 61-case test suite
 python3 hooks/benchmark_token_savings.py    # token-savings benchmark
 ```
 

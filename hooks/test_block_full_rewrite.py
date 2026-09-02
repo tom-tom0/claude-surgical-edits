@@ -232,6 +232,40 @@ def main():
     f5k = fixture("f5k.txt", lines(5000))
     check("5k lines, alternating (exact path worst case)", payload(f5k, alternating(5000)), "deny", max_seconds=6)
 
+    print("\n== Group 9: substantive-line weighting (from 48-scenario edit-pattern study) ==")
+    # A genuine CSS/JS rewrite keeps every lone brace and blank separator.
+    # Those trivial lines (<=3 chars stripped) must not count as "retyped".
+    css_old = "".join(
+        f".rule-{i} {{\n  color: #a{i%10}b{i%10}c{i%10};\n  margin: {i}px;\n}}\n\n" for i in range(20)
+    )
+    css_new = ":root {\n  --brand: #336699;\n}\n" + "".join(
+        f".rule-{i} {{\n  color: var(--brand);\n  padding: {i*2}px {i}px;\n  display: flex;\n}}\n\n" for i in range(20)
+    )
+    f_css = fixture("rewrite.css", css_old)
+    check("brace-heavy CSS rewrite (only braces/blanks survive)", payload(f_css, css_new), "allow")
+    # Doc reflow: blank separator lines survive, every paragraph changes.
+    doc_old = "".join(f"Question {i}: " + "words " * 30 + "\n\n" for i in range(20))
+    doc_new = "".join(
+        f"## Q{i}\n" + "".join("words " * 8 + "\n" for _ in range(4)) + "\n" for i in range(20)
+    )
+    f_doc = fixture("faq.md", doc_old)
+    check("doc reflow (only blank separators survive)", payload(f_doc, doc_new), "allow")
+    # A file that is mostly trivial lines has nothing meaningful to waste.
+    f_triv = fixture("trivial.txt", ("}\n" * 30 + "real content line here\n" * 10))
+    check("mostly-trivial file, 1 real change", payload(f_triv, "}\n" * 30 + "real content line here\n" * 9 + "changed content line\n"), "allow")
+    # But substantive retyping still denies even with braces around it.
+    js_old = "".join(f"function f{i}() {{\n  return compute({i}) + offset_{i};\n}}\n" for i in range(30))
+    js_new = js_old.replace("offset_7", "OFFSET_7")
+    f_js = fixture("braces.js", js_old)
+    check("brace-heavy file, 1 substantive change", payload(f_js, js_new), "deny")
+    # Intended behavior, documented: normalizing mixed line endings while
+    # changing one value is allowed — Edit cannot practically convert
+    # endings, so blocking would break a legitimate whole-file operation.
+    mixed = "".join((f"key{i} = value{i}\r\n" if i % 3 else f"key{i} = value{i}\n") for i in range(40))
+    f_mixed = fixture("mixed.ini", mixed)
+    normalized = "".join(f"key{i} = value{i}\n" for i in range(40)).replace("key7 = value7", "key7 = enabled")
+    check("mixed CRLF/LF normalize + 1 change (intended allow)", payload(f_mixed, normalized), "allow")
+
     print("\n== Summary ==")
     total = PASS + len(FAIL)
     print(f"{PASS}/{total} passed")
