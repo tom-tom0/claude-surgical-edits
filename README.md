@@ -96,4 +96,7 @@ Thresholds at the top of `hooks/block-full-rewrite.py`:
 
 - `MIN_UNCHANGED_LINES` (20) — minimum retyped-unchanged lines before blocking
 - `MIN_UNCHANGED_FRACTION` (0.5) — minimum fraction of the file left unchanged
-- `MAX_LINES` (50000) — files larger than this are never checked (fail open)
+- `MAX_BYTES` (32 MB) — existing files larger than this are never read or
+  checked (fail open); there is no line-count cap
+- `EXACT_DIFF_MAX_LINES` (5000) — above this, the O(n) estimate replaces the
+  exact diff
