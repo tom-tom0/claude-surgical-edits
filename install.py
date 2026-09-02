@@ -8,6 +8,7 @@ steering instruction to ~/.claude/CLAUDE.md if it is not already present.
 import json
 import os
 import shutil
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CLAUDE_DIR = os.path.expanduser("~/.claude")
@@ -44,8 +45,14 @@ def main():
     settings_path = os.path.join(CLAUDE_DIR, "settings.json")
     settings = {}
     if os.path.exists(settings_path):
-        with open(settings_path) as f:
-            settings = json.load(f)
+        try:
+            with open(settings_path) as f:
+                settings = json.load(f)
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            sys.exit(
+                f"error: {settings_path} is not valid JSON ({exc}).\n"
+                "Fix or remove it, then re-run install.py. Nothing was changed."
+            )
     pre = settings.setdefault("hooks", {}).setdefault("PreToolUse", [])
     already = any(
         h.get("command") == HOOK_CMD
