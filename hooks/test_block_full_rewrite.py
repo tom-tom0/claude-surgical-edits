@@ -197,7 +197,29 @@ def main():
     check("60k lines (over MAX_LINES cap)", payload(f60k, lines(60000).replace("line 5\n", "X\n")), "allow", max_seconds=5)
     check("40-line file, 60k-line new content", payload(f40, lines(60000)), "allow", max_seconds=5)
     f49k = fixture("f49k.txt", lines(49000))
-    check("49k lines similar (under cap)", payload(f49k, lines(49000).replace("line 7\n", "X\n")), "deny", max_seconds=14)
+    check("49k lines similar (under cap)", payload(f49k, lines(49000).replace("line 7\n", "X\n")), "deny", max_seconds=3)
+
+    print("\n== Group 8: adversarial scale (difflib worst cases) ==")
+    # Alternating changed/unchanged lines is SequenceMatcher's quadratic
+    # worst case (~26s at 20k lines) — the estimate path must answer fast.
+    def alternating(n):
+        return "".join(
+            (f"line {i}\n" if i % 2 == 0 else f"rewritten {i}\n") for i in range(1, n + 1)
+        )
+    f6k = fixture("f6k.txt", lines(6000))
+    check("6k lines, 3 changed (estimate path)", payload(f6k, lines(6000).replace("line 3000\n", "X\n")), "deny", max_seconds=3)
+    f20k = fixture("f20k.txt", lines(20000))
+    check("20k lines, alternating 50% changed (worst case)", payload(f20k, alternating(20000)), "deny", max_seconds=3)
+    check("49k lines, alternating 50% changed (worst case)", payload(f49k, alternating(49000)), "deny", max_seconds=3)
+    check("49k lines, all different (prescreen fast-path)", payload(f49k, lines(49000, prefix="zzz")), "allow", max_seconds=3)
+    # Reordering a huge file still retypes every line: estimate path denies.
+    halves = lines(30000).splitlines(keepends=True)
+    reordered = "".join(halves[15000:] + halves[:15000])
+    f30k = fixture("f30k.txt", lines(30000))
+    check("30k lines reordered (still a full retype)", payload(f30k, reordered), "deny", max_seconds=3)
+    # At exact-diff scale, a 5k alternating file must still be exact and fast.
+    f5k = fixture("f5k.txt", lines(5000))
+    check("5k lines, alternating (exact path worst case)", payload(f5k, alternating(5000)), "deny", max_seconds=6)
 
     print("\n== Summary ==")
     total = PASS + len(FAIL)

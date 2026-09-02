@@ -27,9 +27,17 @@ Two layers, both user-level (apply to every project and session):
 
 The hook never blocks legitimate writes: new files, short files (< 20 lines),
 binary/non-UTF-8 files, line-ending conversions, and genuine rewrites where
-most content changes all pass through. Files over 50,000 lines are skipped to
-keep the check instant. Any internal error fails open — a broken hook can
-never block your work.
+most content changes all pass through. Any internal error fails open — a
+broken hook can never block your work.
+
+**Large files.** The check is engineered to stay instant at any size people
+actually hit: an O(n) prescreen fast-paths genuine rewrites, the exact diff
+runs up to 5,000 lines, and above that a conservative O(n) estimate decides
+(files over 50,000 lines fail open entirely). Measured worst cases — the
+adversarial ones, not the friendly ones: 49,000 lines with every other line
+changed (difflib's quadratic nightmare, which would otherwise take ~2.5
+minutes) answers in ~80 ms; a 10 MB file of long minified lines in ~130 ms.
+The registered hook timeout is 15 s; nothing measured comes within 100x of it.
 
 ## Install
 
@@ -44,10 +52,17 @@ Run `/hooks` once in Claude Code (or restart it) to load the new hook.
 
 Manual install: see `settings-snippet.json` and `claude-md-snippet.md`.
 
+**Windows note:** the registered hook command invokes `python3`, which exists
+on Linux/macOS but not on stock Windows (where the launcher is `python` or
+`py`). On Windows, after installing, edit the hook entry in
+`~/.claude/settings.json` to use `python` instead of `python3`. Hooks fail
+open, so a wrong interpreter name never blocks writes — the hook just
+silently does nothing until the command is fixed.
+
 ## Verify and benchmark
 
 ```sh
-python3 hooks/test_block_full_rewrite.py    # 47-case test suite
+python3 hooks/test_block_full_rewrite.py    # 53-case test suite
 python3 hooks/benchmark_token_savings.py    # token-savings benchmark
 ```
 
